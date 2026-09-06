@@ -107,12 +107,9 @@ EdgeOne Pages 提供**国内节点**，解析抖音/快手的成功率比海外�
 
 ### 方式二：GitHub Actions 自动部署
 
-项目已包含 `.github/workflows/deploy.yml`，只要给仓库添加 Secret：
+（可选）如需改用 GitHub Actions 推送部署，自行在仓库创建 `.github/workflows/deploy.yml` 并配置 Secret `EDGEONE_API_TOKEN`（值取 EdgeOne Pages 控制台生成的 API Token）。
 
-- 名：`EDGEONE_API_TOKEN`
-- 值：EdgeOne Pages 控制台生成的 API Token
-
-之后每次 push 到 `main` 会自动执行 `npm run build` 并部署到 EdgeOne Pages。
+本仓库默认推荐 **方式一（Git 集成）**：push 到 `main` 即由 EdgeOne 自动执行 `npm run build` 并部署，无需额外配置。
 
 ### 可选：配置第三方兜底 API
 
