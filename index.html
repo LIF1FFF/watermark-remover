@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>去水印 · 多平台视频解析下载</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💧</text></svg>">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="bg-orbs">
+  <span class="orb orb1"></span>
+  <span class="orb orb2"></span>
+  <span class="orb orb3"></span>
+</div>
+
+<header class="topbar">
+  <div class="logo">
+    <span class="logo-icon">💧</span>
+    <span class="logo-text">去水印</span>
+  </div>
+  <button class="icon-btn" id="settingsBtn" title="设置">⚙️</button>
+</header>
+
+<main class="container">
+  <section class="hero">
+    <h1>一键去除视频水印</h1>
+    <p>粘贴分享链接，解析并下载<strong>无水印</strong>原视频 / 高清原图</p>
+  </section>
+
+  <section class="platforms" id="platforms"></section>
+
+  <section class="input-card">
+    <div class="input-wrap">
+      <textarea id="urlInput" rows="3" placeholder="粘贴抖音 / 快手 / 小红书 / 微博 / B站 分享链接或口令&#10;例如：7.43 pda:/ 让你在几秒钟之内记住我 https://v.douyin.com/L5pbfdP/"></textarea>
+      <button class="clear-btn" id="clearBtn" title="清空">✕</button>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" id="parseBtn">
+        <span class="btn-text">解析去水印</span>
+        <span class="spinner" hidden></span>
+      </button>
+      <button class="btn btn-ghost" id="pasteBtn">📋 粘贴</button>
+    </div>
+    <div class="err" id="errorBox" hidden></div>
+  </section>
+
+  <section class="result" id="result" hidden></section>
+
+  <section class="tips">
+    <h3>使用说明</h3>
+    <ol>
+      <li>打开 App，点<strong>分享 → 复制链接</strong></li>
+      <li>回到这里粘贴，点「解析去水印」</li>
+      <li>预览确认后，点<strong>下载无水印视频</strong></li>
+    </ol>
+    <p class="disclaimer">仅供下载本人拥有版权的作品，请勿用于侵犯他人权益的用途。</p>
+  </section>
+</main>
+
+<!-- 设置弹窗 -->
+<div class="modal" id="settingsModal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>设置</h3>
+      <button class="icon-btn" id="closeSettings">✕</button>
+    </div>
+    <label class="field">
+      <span>第三方解析 API（官方接口失效时兜底）</span>
+      <input type="text" id="apiInput" placeholder="https://your-api.com/parse?url={{url}}">
+      <small>留空则仅使用内置解析引擎。填 <code>{{url}}</code> 表示待解析链接位置。</small>
+    </label>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="saveConfig">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="/app.js"></script>
+</body>
+</html>
