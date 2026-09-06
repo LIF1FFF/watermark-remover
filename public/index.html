@@ -19,7 +19,6 @@
     <span class="logo-icon">💧</span>
     <span class="logo-text">去水印</span>
   </div>
-  <button class="icon-btn" id="settingsBtn" title="设置">⚙️</button>
 </header>
 
 <main class="container">
@@ -58,23 +57,7 @@
   </section>
 </main>
 
-<!-- 设置弹窗 -->
-<div class="modal" id="settingsModal" hidden>
-  <div class="modal-card">
-    <div class="modal-head">
-      <h3>设置</h3>
-      <button class="icon-btn" id="closeSettings">✕</button>
-    </div>
-    <label class="field">
-      <span>第三方解析 API（官方接口失效时兜底）</span>
-      <input type="text" id="apiInput" placeholder="https://your-api.com/parse?url={{url}}">
-      <small>留空则仅使用内置解析引擎。填 <code>{{url}}</code> 表示待解析链接位置。</small>
-    </label>
-    <div class="modal-actions">
-      <button class="btn btn-primary" id="saveConfig">保存</button>
-    </div>
-  </div>
-</div>
+  <!-- 默认使用内置解析引擎，不显示第三方 API 设置入口 -->
 
 <div class="toast" id="toast" hidden></div>
 

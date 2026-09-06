@@ -113,11 +113,10 @@
     parseBtn.disabled = true;
 
     try {
-      const thirdPartyApi = localStorage.getItem('wm_thirdPartyApi') || '';
-      const res = await fetch('/api/parse', {
+        const res = await fetch('/api/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, thirdPartyApi }),
+        body: JSON.stringify({ url }),
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || '解析失败');
@@ -225,22 +224,7 @@
     return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  // 设置（第三方解析 API 兜底：存本地，serverless 环境不持久化）
-  const modal = $('#settingsModal');
-  const apiInput = $('#apiInput');
-  $('#settingsBtn').addEventListener('click', () => {
-    apiInput.value = localStorage.getItem('wm_thirdPartyApi') || '';
-    modal.hidden = false;
-  });
-  $('#closeSettings').addEventListener('click', () => (modal.hidden = true));
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.hidden = true;
-  });
-  $('#saveConfig').addEventListener('click', () => {
-    localStorage.setItem('wm_thirdPartyApi', apiInput.value.trim());
-    showToast('设置已保存（本地）');
-    modal.hidden = true;
-  });
+  // 默认使用内置解析引擎，不暴露第三方 API 设置入口
 
   // 拖动/粘贴自动解析
   urlInput.addEventListener('paste', () => {
