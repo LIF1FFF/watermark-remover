@@ -40,6 +40,8 @@ node server.js
 watermark-remover/
 ├── server.js                  # 本地 HTTP 服务（Node 原生，node server.js 启动）
 ├── package.json               # type: module（零依赖）
+├── scripts/
+│   └── build.mjs              # EdgeOne 部署前打包：生成 dist/
 ├── cloud-functions/           # EdgeOne Pages 边缘函数（部署到 EdgeOne 时使用）
 │   └── api/
 │       ├── parse/index.js        # POST  /api/parse
@@ -56,7 +58,7 @@ watermark-remover/
 │       ├── bilibili.js        # B站
 │       ├── weibo.js           # 微博
 │       └── xiaohongshu.js     # 小红书
-└── public/                    # 前端页面（EdgeOne 输出目录）
+└── public/                    # 前端页面（本地开发 / 部署源）
     ├── index.html
     ├── style.css
     └── app.js
@@ -87,10 +89,12 @@ EdgeOne Pages 提供**国内节点**，解析抖音/快手的成功率比海外�
 3. 构建设置：
    - **框架预设**：`Others`（无框架）
    - **安装命令**：留空（零依赖，无需 npm install）
-   - **构建命令**：留空
-   - **输出目录**：`public`
+   - **构建命令**：`npm run build`
+   - **输出目录**：`dist`
 4. 点击「部署」，等待完成
-5. `cloud-functions/` 目录下的函数会自动挂载到对应 `/api/*` 路由
+5. `dist/cloud-functions/` 目录下的函数会自动挂载到对应 `/api/*` 路由
+
+> 为什么输出目录是 `dist` 而不是 `public`？因为 `cloud-functions/` 里的函数通过相对路径 `../../lib/` 引用了 `lib/`，必须把 `public/` 的静态文件、`cloud-functions/`、`lib/`、`package.json` 一起打包到同一个根目录。`npm run build` 会自动完成这件事。
 
 ### 路由映射
 
@@ -100,6 +104,15 @@ EdgeOne Pages 提供**国内节点**，解析抖音/快手的成功率比海外�
 | `cloud-functions/api/download/index.js` | `https://你的域名/api/download` |
 | `cloud-functions/api/image/index.js` | `https://你的域名/api/image` |
 | `cloud-functions/api/platforms/index.js` | `https://你的域名/api/platforms` |
+
+### 方式二：GitHub Actions 自动部署
+
+项目已包含 `.github/workflows/deploy.yml`，只要给仓库添加 Secret：
+
+- 名：`EDGEONE_API_TOKEN`
+- 值：EdgeOne Pages 控制台生成的 API Token
+
+之后每次 push 到 `main` 会自动执行 `npm run build` 并部署到 EdgeOne Pages。
 
 ### 可选：配置第三方兜底 API
 

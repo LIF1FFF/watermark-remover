@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "edgeone pages dev"
+    "dev": "node server.js",
+    "build": "node scripts/build.mjs"
   },
   "engines": {
     "node": ">=18"
