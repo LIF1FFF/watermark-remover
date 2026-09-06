@@ -113,10 +113,11 @@
     parseBtn.disabled = true;
 
     try {
+      const thirdPartyApi = localStorage.getItem('wm_thirdPartyApi') || '';
       const res = await fetch('/api/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, thirdPartyApi }),
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || '解析失败');
@@ -224,16 +225,11 @@
     return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  // 设置
+  // 设置（第三方解析 API 兜底：存本地，serverless 环境不持久化）
   const modal = $('#settingsModal');
   const apiInput = $('#apiInput');
   $('#settingsBtn').addEventListener('click', () => {
-    fetch('/api/config')
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.ok) apiInput.value = res.config.thirdPartyApi || '';
-      })
-      .catch(() => {});
+    apiInput.value = localStorage.getItem('wm_thirdPartyApi') || '';
     modal.hidden = false;
   });
   $('#closeSettings').addEventListener('click', () => (modal.hidden = true));
@@ -241,17 +237,9 @@
     if (e.target === modal) modal.hidden = true;
   });
   $('#saveConfig').addEventListener('click', () => {
-    fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ thirdPartyApi: apiInput.value }),
-    })
-      .then((r) => r.json())
-      .then(() => {
-        showToast('设置已保存');
-        modal.hidden = true;
-      })
-      .catch(() => showToast('保存失败'));
+    localStorage.setItem('wm_thirdPartyApi', apiInput.value.trim());
+    showToast('设置已保存（本地）');
+    modal.hidden = true;
   });
 
   // 拖动/粘贴自动解析

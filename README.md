@@ -2,7 +2,7 @@
 
 粘贴短视频分享链接，一键解析并下载**无水印**原视频 / 高清原图。
 
-零依赖（只用 Node.js 内置模块），无需 `npm install`。
+零依赖（只用 Node.js 内置模块 + 全局 fetch），无需 `npm install`。
 
 ## 支持的平台
 
@@ -14,7 +14,7 @@
 | 小红书 | ⚠️ 未实测 | 风控较严，可能需要第三方 API |
 | 微博 | ⚠️ 未实测 | 视频 + 图集已适配 |
 
-## 快速开始
+## 本地运行
 
 ```bash
 cd watermark-remover
@@ -25,6 +25,7 @@ node server.js
 可选环境变量：
 - `PORT` 端口（默认 3000）
 - `DEBUG=1` 开启解析/下载调试日志
+- `THIRD_PARTY_API` 第三方兜底解析 API
 
 ## 工作原理
 
@@ -37,44 +38,85 @@ node server.js
 
 ```
 watermark-remover/
-├── server.js              # HTTP 服务 + 路由 + 下载代理
+├── server.js                  # 本地 HTTP 服务（Node 原生，node server.js 启动）
+├── package.json               # type: module（零依赖）
+├── cloud-functions/           # EdgeOne Pages 边缘函数（部署到 EdgeOne 时使用）
+│   └── api/
+│       ├── parse/index.js        # POST  /api/parse
+│       ├── download/index.js     # GET  /api/download
+│       ├── image/index.js        # GET  /api/image
+│       └── platforms/index.js    # GET  /api/platforms
+│       └── _proxy.js             # 下载/图片代理共享逻辑
 ├── lib/
-│   ├── http.js            # 请求封装（重定向、解压、UA）
-│   └── parsers/           # 各平台解析器
-│       ├── douyin.js      # 抖音（ttwid + 多策略降级）
-│       ├── kuaishou.js    # 快手
-│       ├── bilibili.js    # B站
-│       ├── weibo.js       # 微博
-│       └── xiaohongshu.js # 小红书
-└── public/                # 前端页面
+│   ├── http.js                # 请求封装（重定向、解压、UA）
+│   ├── referer.js             # 防盗链 Referer 猜测
+│   └── parsers/               # 各平台解析器（ESM）
+│       ├── douyin.js          # 抖音（ttwid + 多策略降级）
+│       ├── kuaishou.js        # 快手
+│       ├── bilibili.js        # B站
+│       ├── weibo.js           # 微博
+│       └── xiaohongshu.js     # 小红书
+└── public/                    # 前端页面（EdgeOne 输出目录）
+    ├── index.html
+    ├── style.css
+    └── app.js
 ```
+
+两套入口共用 `lib/`：本地用 `server.js`（原生 http 服务），上线用 `cloud-functions/`（EdgeOne 边缘函数），逻辑一致。
 
 ## API
 
 | 接口 | 方法 | 说明 |
 |---|---|---|
-| `/api/parse` | POST | `{url}` → 解析结果 |
+| `/api/parse` | POST | `{url, thirdPartyApi?}` → 解析结果 |
 | `/api/download?url=&name=` | GET | 代理下载（附件） |
 | `/api/download?url=&inline=1` | GET | 在线预览 |
 | `/api/image?url=` | GET | 图片/封面代理 |
 | `/api/platforms` | GET | 平台列表 |
-| `/api/config` | GET/POST | 第三方 API 配置 |
 
-## 第三方 API 兜底
+> 设置里的第三方 API 存于浏览器 `localStorage`（serverless 环境无状态，不写服务端），解析时随请求带上。
 
-当官方接口失效时，可在页面「设置」中填入任意解析 API：
+## 部署到 EdgeOne Pages（推荐）
+
+EdgeOne Pages 提供**国内节点**，解析抖音/快手的成功率比海外服务器高得多。
+
+### 方式一：连 GitHub 自动部署
+
+1. 确保代码已推送到 GitHub（本项目已对应 `LIF1FFF/watermark-remover`）
+2. 打开 [EdgeOne Pages 控制台](https://console.edgeone.ai/pages) → 新建项目 → 连接 GitHub → 选中 `watermark-remover`
+3. 构建设置：
+   - **框架预设**：`Others`（无框架）
+   - **安装命令**：留空（零依赖，无需 npm install）
+   - **构建命令**：留空
+   - **输出目录**：`public`
+4. 点击「部署」，等待完成
+5. `cloud-functions/` 目录下的函数会自动挂载到对应 `/api/*` 路由
+
+### 路由映射
+
+| 函数文件 | 线上路由 |
+|---|---|
+| `cloud-functions/api/parse/index.js` | `https://你的域名/api/parse` |
+| `cloud-functions/api/download/index.js` | `https://你的域名/api/download` |
+| `cloud-functions/api/image/index.js` | `https://你的域名/api/image` |
+| `cloud-functions/api/platforms/index.js` | `https://你的域名/api/platforms` |
+
+### 可选：配置第三方兜底 API
+
+在项目环境变量（控制台「环境变量」）中添加：
 
 ```
-https://your-api.com/parse?url={{url}}
+THIRD_PARTY_API=https://your-api.com/parse?url={{url}}
 ```
 
-`{{url}}` 会替换为待解析链接。留空则仅用内置引擎。
+`{{url}}` 会被自动替换为待解析链接；官方接口失效时自动切换过去。
 
-## 部署建议
+> 若 EdgeOne 要求函数目录名为 `node-functions` 而非 `cloud-functions`，直接重命名该目录即可，内部结构不变。
 
-- **有 Node 环境**：直接 `node server.js`，配合 Nginx 反代
-- **Vercel / Render 等**：需把 HTTP 服务改造成对应平台的函数入口
-- **EdgeOne Pages**：静态部分可直接托管，解析接口需改用边缘函数实现
+## 其他部署方式
+
+- **Nginx + Node**：`node server.js` 后由 Nginx 反代
+- **Vercel / Render**：把 `server.js` 改造成平台函数入口（本项目 `cloud-functions/` 已给出边缘函数范式，可参照迁移）
 
 > 部署在**国内服务器**解析成功率最高。抖音等平台对海外 IP 有额外限制。
 

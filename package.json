@@ -1,0 +1,14 @@
+{
+  "name": "watermark-remover",
+  "version": "1.0.0",
+  "description": "多平台去水印解析工具",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "edgeone pages dev"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

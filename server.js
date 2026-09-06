@@ -1,21 +1,19 @@
 'use strict';
 
-const http = require('http');
-const https = require('https');
-const fs = require('fs');
-const path = require('path');
-const { URL } = require('url');
-
-const { parse: parseMedia, listPlatforms } = require('./lib/parsers');
-const { request } = require('./lib/http');
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { Readable } from 'node:stream';
+import { parse, listPlatforms } from './lib/parsers/index.js';
+import { guessReferer, MOBILE_UA } from './lib/referer.js';
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
-const PUBLIC_DIR = path.join(__dirname, 'public');
+const PUBLIC_DIR = path.join(import.meta.dirname, 'public');
 
 // 运行时配置（第三方解析 API）
-const CONFIG_FILE = path.join(__dirname, 'config.json');
-let config = { thirdPartyApi: '', proxyDownload: true };
+const CONFIG_FILE = path.join(import.meta.dirname, 'config.json');
+let config = { thirdPartyApi: process.env.THIRD_PARTY_API || '' };
 try {
   if (fs.existsSync(CONFIG_FILE)) {
     config = { ...config, ...JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) };
@@ -49,31 +47,16 @@ function sendJSON(res, code, data) {
   res.end(body);
 }
 
-/** 根据域名生成合适的 Referer，绕过部分防盗链 */
-function guessReferer(url) {
-  if (/douyin|iesdouyin|amemv|douyinvod|snssdk|byteimg|ixigua|zjcdn/i.test(url)) return 'https://www.douyin.com/';
-  if (/kuaishou|chenzhongtech|gifshow|ksyun|ks-cdn|yximgs/i.test(url)) return 'https://www.kuaishou.com/';
-  if (/bilibili|hdslb|bilivideo|biliapi/i.test(url)) return 'https://www.bilibili.com/';
-  if (/weibo|sinaimg|weibocdn|miaopai/i.test(url)) return 'https://weibo.com/';
-  if (/xiaohongshu|xhscdn|xhslink/i.test(url)) return 'https://www.xiaohongshu.com/';
-  try {
-    return new URL(url).origin + '/';
-  } catch (e) {
-    return '';
-  }
-}
-
 /** 第三方解析 API 调用（用户可在设置中配置） */
-async function thirdPartyApi(url, platform) {
-  if (!config.thirdPartyApi) return null;
-  const api = config.thirdPartyApi.includes('{{url}}')
-    ? config.thirdPartyApi.replace('{{url}}', encodeURIComponent(url))
-    : `${config.thirdPartyApi}${config.thirdPartyApi.includes('?') ? '&' : '?'}url=${encodeURIComponent(url)}`;
+async function thirdPartyApi(url, api) {
+  if (!api) return null;
+  const endpoint = api.includes('{{url}}')
+    ? api.replace('{{url}}', encodeURIComponent(url))
+    : `${api}${api.includes('?') ? '&' : '?'}url=${encodeURIComponent(url)}`;
 
-  const res = await request(api, { timeout: 20000 });
-  const data = JSON.parse(res.body);
+  const res = await fetch(endpoint, { headers: { 'User-Agent': MOBILE_UA }, redirect: 'follow' });
+  const data = await res.json();
 
-  // 兼容常见返回结构
   const findUrl = (obj) => {
     if (!obj || typeof obj !== 'object') return null;
     const keys = ['url', 'play_url', 'playUrl', 'video_url', 'nwm_video_url', 'wm_video_url', 'videoUrl', 'link'];
@@ -92,121 +75,79 @@ async function thirdPartyApi(url, platform) {
   if (direct) videos.push(direct);
   if (Array.isArray(data?.data?.images)) {
     return {
-      id: '',
-      platform,
-      type: 'images',
-      title: data?.data?.title || '解析结果',
-      author: data?.data?.author || '',
-      authorId: '',
-      cover: data?.data?.images[0] || '',
-      duration: 0,
-      videos,
-      images: data.data.images,
-      raw: 'third-party',
+      id: '', platform: 'third-party', type: 'images',
+      title: data?.data?.title || '解析结果', author: data?.data?.author || '',
+      authorId: '', cover: data?.data?.images[0] || '', duration: 0,
+      videos, images: data.data.images, raw: 'third-party',
     };
   }
   if (videos.length) {
     return {
-      id: '',
-      platform,
-      type: 'video',
-      title: data?.data?.title || data?.title || '解析结果',
-      author: data?.data?.author || '',
-      authorId: '',
-      cover: data?.data?.cover || data?.cover || '',
-      duration: 0,
-      videos,
-      images: [],
-      raw: 'third-party',
+      id: '', platform: 'third-party', type: 'video',
+      title: data?.data?.title || data?.title || '解析结果', author: data?.data?.author || '',
+      authorId: '', cover: data?.data?.cover || data?.cover || '', duration: 0,
+      videos, images: [], raw: 'third-party',
     };
   }
   return null;
 }
 
-/** 代理下载：流式转发，绕过防盗链 */
-function proxyDownload(req, res, targetUrl, filename, inline, depth = 0) {
-  let parsed;
-  try {
-    parsed = new URL(targetUrl);
-  } catch (e) {
-    return sendJSON(res, 400, { error: '下载地址无效' });
-  }
-  if (depth > 5) return sendJSON(res, 502, { error: '重定向次数过多' });
-
-  const isHttps = parsed.protocol === 'https:';
-  const client = isHttps ? https : http;
-
+/** 代理下载：用全局 fetch 拉取上游，流式转发，绕过防盗链 */
+async function proxyDownload(req, res, targetUrl, filename, inline) {
   const headers = {
-    'User-Agent':
-      'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+    'User-Agent': MOBILE_UA,
     Referer: guessReferer(targetUrl),
     Accept: '*/*',
   };
-  // 支持断点续传
   if (req.headers.range) headers.Range = req.headers.range;
 
-  const proxyReq = client.request(
-    {
-      hostname: parsed.hostname,
-      port: parsed.port || (isHttps ? 443 : 80),
-      path: parsed.pathname + parsed.search,
-      method: 'GET',
-      headers,
-      timeout: 30000, // 仅限制首字节等待时间，响应开始后会被取消
-    },
-    (proxyRes) => {
-      // 收到响应头后取消超时限制，避免大文件下载被中断
-      try { proxyReq.setTimeout(0); } catch (e) {}
-      if (process.env.DEBUG) {
-        console.error('[dl] upstream', proxyRes.statusCode, 'len=', proxyRes.headers['content-length'], 'type=', proxyRes.headers['content-type']);
-      }
+  let upstream;
+  try {
+    upstream = await fetch(targetUrl, { headers, redirect: 'follow' });
+  } catch (e) {
+    return sendJSON(res, 502, { error: '下载失败: ' + e.message });
+  }
 
-      // 跟随重定向（抖音 play 地址会 302 到真实 CDN）
-      if ([301, 302, 303, 307, 308].includes(proxyRes.statusCode) && proxyRes.headers.location) {
-        proxyRes.resume();
-        let next = proxyRes.headers.location;
-        if (next.startsWith('/')) next = parsed.origin + next;
-        return proxyDownload(req, res, next, filename, inline, depth + 1);
-      }
+  if (process.env.DEBUG) {
+    console.error('[dl] upstream', upstream.status, 'type=', upstream.headers.get('content-type'));
+  }
+  // 如实传递上游状态码（403/404/206 等），便于前端定位盗链/失效问题
+  if (upstream.status >= 400) {
+    const text = await upstream.text().catch(() => '');
+    return sendJSON(res, upstream.status, { error: '源站返回 ' + upstream.status + (text ? ': ' + text.slice(0, 200) : '') });
+  }
 
-      const outHeaders = {
-        'Access-Control-Allow-Origin': '*',
-        'Accept-Ranges': 'bytes',
-      };
-      if (proxyRes.headers['content-type']) outHeaders['Content-Type'] = proxyRes.headers['content-type'];
-      if (proxyRes.headers['content-length']) outHeaders['Content-Length'] = proxyRes.headers['content-length'];
-      if (proxyRes.headers['content-range']) outHeaders['Content-Range'] = proxyRes.headers['content-range'];
+  const outHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Expose-Headers': '*',
+    'Cache-Control': 'no-store',
+  };
+  const ct = upstream.headers.get('content-type');
+  if (ct) outHeaders['Content-Type'] = ct;
+  const cl = upstream.headers.get('content-length');
+  if (cl) outHeaders['Content-Length'] = cl;
+  const cr = upstream.headers.get('content-range');
+  if (cr) outHeaders['Content-Range'] = cr;
+  const ar = upstream.headers.get('accept-ranges');
+  if (ar) outHeaders['Accept-Ranges'] = ar;
 
-      const disposition = inline ? 'inline' : 'attachment';
-      const safeName = encodeURIComponent(filename || 'download.mp4');
-      outHeaders['Content-Disposition'] = `${disposition}; filename*=UTF-8''${safeName}`;
+  const disposition = inline ? 'inline' : 'attachment';
+  const safeName = encodeURIComponent(filename || 'download.mp4');
+  outHeaders['Content-Disposition'] = `${disposition}; filename*=UTF-8''${safeName}`;
 
-      // 如实传递状态码，便于定位盗链/失效等问题
-      res.writeHead(proxyRes.statusCode, outHeaders);
-      proxyRes.pipe(res);
-    }
-  );
+  res.writeHead(upstream.status || 200, outHeaders);
 
-  proxyReq.on('error', (e) => {
-    if (process.env.DEBUG) console.error('[dl] ERROR', e.message);
-    if (!res.headersSent) sendJSON(res, 502, { error: '下载失败: ' + e.message });
-    else res.end();
-  });
-  proxyReq.on('timeout', () => {
-    proxyReq.destroy(new Error('连接超时（源站无响应）'));
-  });
-  // 客户端中断时同步销毁上游请求
-  res.on('close', () => {
-    try { proxyReq.destroy(); } catch (e) {}
-  });
-  proxyReq.end();
+  if (!upstream.body) return res.end();
+  // Web ReadableStream -> Node Readable -> http 响应
+  const nodeStream = Readable.fromWeb(upstream.body);
+  nodeStream.on('error', () => res.destroy());
+  nodeStream.pipe(res);
 }
 
 const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host}`);
   const pathname = reqUrl.pathname;
 
-  // CORS 预检
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
@@ -222,10 +163,11 @@ const server = http.createServer(async (req, res) => {
     req.on('data', (c) => (body += c));
     req.on('end', async () => {
       try {
-        const { url } = JSON.parse(body || '{}');
+        const { url, thirdPartyApi } = JSON.parse(body || '{}');
         if (!url) return sendJSON(res, 400, { error: '请输入视频链接' });
         const t0 = Date.now();
-        const result = await parseMedia(url, { thirdPartyApi });
+        const api = thirdPartyApi || config.thirdPartyApi || process.env.THIRD_PARTY_API || '';
+        const result = await parse(url, api ? { thirdPartyApi: api } : {});
         result.cost = Date.now() - t0;
         sendJSON(res, 200, { ok: true, data: result });
       } catch (e) {
@@ -258,17 +200,15 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, { ok: true, config: { thirdPartyApi: config.thirdPartyApi } });
   }
 
-  // 下载代理 /api/download?url=...&name=...&inline=1
   if (pathname === '/api/download') {
     const target = reqUrl.searchParams.get('url');
     const name = reqUrl.searchParams.get('name') || 'video.mp4';
     const inline = reqUrl.searchParams.get('inline') === '1';
     if (!target) return sendJSON(res, 400, { error: '缺少 url 参数' });
-    if (process.env.DEBUG) console.error('[dl] target len', target.length, target.slice(0, 60));
+    if (process.env.DEBUG) console.error('[dl] target', target.slice(0, 60));
     return proxyDownload(req, res, target, name, inline);
   }
 
-  // 图片/封面代理（避免前端跨域）
   if (pathname === '/api/image') {
     const target = reqUrl.searchParams.get('url');
     if (!target) return sendJSON(res, 400, { error: '缺少 url 参数' });
@@ -300,5 +240,3 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`去水印服务已启动: http://localhost:${PORT}`);
 });
-
-module.exports = server;
