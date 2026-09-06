@@ -10,12 +10,10 @@
   const toast = $('#toast');
 
   const PLATFORM_ICON = {
-    douyin: '🎵', kuaishou: '⚡', xiaohongshu: '📕',
-    weibo: '🌐', bilibili: '📺', direct: '🔗',
+    douyin: '🎵', bilibili: '📺', direct: '🔗',
   };
   const PLATFORM_NAME = {
-    douyin: '抖音', kuaishou: '快手', xiaohongshu: '小红书',
-    weibo: '微博', bilibili: '哔哩哔哩', direct: '直链',
+    douyin: '抖音', bilibili: '哔哩哔哩', direct: '直链',
   };
 
   let toastTimer = null;
@@ -57,9 +55,6 @@
     const v = urlInput.value;
     const map = [
       [/douyin\.com|iesdouyin/i, 'douyin'],
-      [/kuaishou\.com|gifshow/i, 'kuaishou'],
-      [/xiaohongshu\.com|xhslink/i, 'xiaohongshu'],
-      [/weibo\.com|weibo\.cn/i, 'weibo'],
       [/bilibili\.com|b23\.tv/i, 'bilibili'],
     ];
     const chips = platformsBox.querySelectorAll('.chip');
