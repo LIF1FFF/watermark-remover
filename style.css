@@ -224,3 +224,13 @@ body {
   .actions { flex-wrap: wrap; }
   .btn { font-size: 14px; padding: 12px 16px; }
 }
+
+/* 底部版权 */
+.site-footer {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 28px 15px 40px;
+  line-height: 1.9;
+}
+.site-footer p { margin: 0; }

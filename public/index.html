@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>去水印 · 多平台视频解析下载</title>
+<title>反反去水印 · 多平台视频解析下载</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💧</text></svg>">
 <link rel="stylesheet" href="/style.css">
 </head>
@@ -17,7 +17,7 @@
 <header class="topbar">
   <div class="logo">
     <span class="logo-icon">💧</span>
-    <span class="logo-text">去水印</span>
+    <span class="logo-text">反反去水印</span>
   </div>
 </header>
 
@@ -57,9 +57,19 @@
   </section>
 </main>
 
-  <!-- 默认使用内置解析引擎，不显示第三方 API 设置入口 -->
+<footer class="site-footer">
+  <p><span id="runtime"></span><br>&copy; 2026 FFF. All Rights Reserved.</p>
+</footer>
 
 <div class="toast" id="toast" hidden></div>
+<script>
+  (function () {
+    var start = new Date('2026-01-01T00:00:00');
+    var days = Math.floor((Date.now() - start.getTime()) / 86400000);
+    var el = document.getElementById('runtime');
+    if (el) el.textContent = '本站已运行 ' + days + ' 天';
+  })();
+</script>
 
 <script src="/app.js"></script>
 </body>
