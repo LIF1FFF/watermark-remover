@@ -58,19 +58,10 @@
 </main>
 
 <footer class="site-footer">
-  <p><span id="runtime"></span><br>&copy; 2026 FFF. All Rights Reserved.</p>
+  <p>&copy; 2026 FFF. All Rights Reserved.</p>
 </footer>
 
 <div class="toast" id="toast" hidden></div>
-<script>
-  (function () {
-    var start = new Date('2026-01-01T00:00:00');
-    var days = Math.floor((Date.now() - start.getTime()) / 86400000);
-    var el = document.getElementById('runtime');
-    if (el) el.textContent = '本站已运行 ' + days + ' 天';
-  })();
-</script>
-
 <script src="/app.js"></script>
 </body>
 </html>
