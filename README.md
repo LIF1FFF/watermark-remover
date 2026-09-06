@@ -111,15 +111,27 @@ EdgeOne Pages 提供**国内节点**，解析抖音/快手的成功率比海外�
 
 本仓库默认推荐 **方式一（Git 集成）**：push 到 `main` 即由 EdgeOne 自动执行 `npm run build` 并部署，无需额外配置。
 
-### 可选：配置第三方兜底 API
+### 可选：配置第三方兜底 API（快手/小红书推荐开启）
 
-在项目环境变量（控制台「环境变量」）中添加：
+内置解析失败时（快手、小红书对非大陆/数据中心 IP 风控很严），会**自动**调用第三方解析 API 兜底，对**所有平台**统一生效，内置成功则不调用。
+
+在 **EdgeOne Pages 控制台 → 项目 → 设置 → 环境变量** 中添加：
 
 ```
 THIRD_PARTY_API=https://your-api.com/parse?url={{url}}
 ```
 
-`{{url}}` 会被自动替换为待解析链接；官方接口失效时自动切换过去。
+- `{{url}}` 自动替换为待解析链接（URL 编码）；不含 `{{url}}` 时自动拼接 `?url=<链接>`
+- 兼容常见返回格式（自动提取视频/图集/标题/作者/封面）：
+  - `{"code":200,"data":{"url":"...","title":"...","authorName":"...","photo":"..."}}`
+  - `{"code":"0001","data":{"playAddr":"...","pics":["..."]}}`
+- 本地开发等价写法：`THIRD_PARTY_API='...' node server.js`
+- 环境变量改动后需**重新部署**才生效
+
+第三方 API 来源（自行注册，公共免费接口稳定性无保证）：
+
+- 智凌 API（免费注册拿 key）：`https://open.17zhilian.cn/api/video/parse-video-url-free?key=<你的key>&url={{url}}`
+- 云析 API：`https://syapi.chuangye.site/`（注册后拿 UID/KEY，产品编码 `dsp`）
 
 > 若 EdgeOne 要求函数目录名为 `node-functions` 而非 `cloud-functions`，直接重命名该目录即可，内部结构不变。
 

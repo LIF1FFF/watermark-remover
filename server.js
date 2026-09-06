@@ -47,50 +47,7 @@ function sendJSON(res, code, data) {
   res.end(body);
 }
 
-/** 第三方解析 API 调用（用户可在设置中配置） */
-async function thirdPartyApi(url, api) {
-  if (!api) return null;
-  const endpoint = api.includes('{{url}}')
-    ? api.replace('{{url}}', encodeURIComponent(url))
-    : `${api}${api.includes('?') ? '&' : '?'}url=${encodeURIComponent(url)}`;
-
-  const res = await fetch(endpoint, { headers: { 'User-Agent': MOBILE_UA }, redirect: 'follow' });
-  const data = await res.json();
-
-  const findUrl = (obj) => {
-    if (!obj || typeof obj !== 'object') return null;
-    const keys = ['url', 'play_url', 'playUrl', 'video_url', 'nwm_video_url', 'wm_video_url', 'videoUrl', 'link'];
-    for (const k of keys) {
-      if (typeof obj[k] === 'string' && /^https?:\/\//.test(obj[k])) return obj[k];
-    }
-    for (const k of Object.keys(obj)) {
-      const r = findUrl(obj[k]);
-      if (r) return r;
-    }
-    return null;
-  };
-
-  const videos = [];
-  const direct = findUrl(data);
-  if (direct) videos.push(direct);
-  if (Array.isArray(data?.data?.images)) {
-    return {
-      id: '', platform: 'third-party', type: 'images',
-      title: data?.data?.title || '解析结果', author: data?.data?.author || '',
-      authorId: '', cover: data?.data?.images[0] || '', duration: 0,
-      videos, images: data.data.images, raw: 'third-party',
-    };
-  }
-  if (videos.length) {
-    return {
-      id: '', platform: 'third-party', type: 'video',
-      title: data?.data?.title || data?.title || '解析结果', author: data?.data?.author || '',
-      authorId: '', cover: data?.data?.cover || data?.cover || '', duration: 0,
-      videos, images: [], raw: 'third-party',
-    };
-  }
-  return null;
-}
+// 第三方解析 API 兜底已迁移至 lib/thirdparty.js，由解析入口统一调用
 
 /** 代理下载：用全局 fetch 拉取上游，流式转发，绕过防盗链 */
 async function proxyDownload(req, res, targetUrl, filename, inline) {
